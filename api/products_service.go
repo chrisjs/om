@@ -118,8 +118,6 @@ func (p ProductsService) Upload(input UploadProductInput) (UploadProductOutput, 
 
 	defer resp.Body.Close()
 
-	p.progress.End()
-
 	if resp.StatusCode != http.StatusOK {
 		out, err := httputil.DumpResponse(resp, true)
 		if err != nil {
