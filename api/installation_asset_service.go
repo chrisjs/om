@@ -112,6 +112,7 @@ func (ia InstallationAssetService) Import(input ImportInstallationInput) error {
 
 	ia.progress.Kickoff()
 	respChan := make(chan error)
+	progressDone := ia.trackProgress()
 	go func() {
 		var elapsedTime int
 		var liveLog logger
@@ -120,14 +121,13 @@ func (ia InstallationAssetService) Import(input ImportInstallationInput) error {
 			case _ = <-respChan:
 				ia.liveWriter.Stop()
 				return
+			case _ = <-progressDone:
+				ia.progress.End()
+				ia.liveWriter.Start()
+				liveLog = log.New(ia.liveWriter, "", 0)
 			default:
 				time.Sleep(1 * time.Second)
-				if ia.progress.GetCurrent() == ia.progress.GetTotal() { // so that we only start logging time elapsed after the progress bar is done
-					ia.progress.End()
-					if elapsedTime == 0 {
-						ia.liveWriter.Start()
-						liveLog = log.New(ia.liveWriter, "", 0)
-					}
+				if liveLog != nil {
 					elapsedTime++
 					liveLog.Printf("%ds elapsed, waiting for response from Ops Manager...\r", elapsedTime)
 				}
@@ -153,4 +153,17 @@ func (ia InstallationAssetService) Import(input ImportInstallationInput) error {
 	}
 
 	return nil
+}
+
+func (ia InstallationAssetService) trackProgress() chan string {
+	progressChan := make(chan string)
+	go func() {
+		for {
+			if ia.progress.GetCurrent() == ia.progress.GetTotal() {
+				progressChan <- "done"
+				break
+			}
+		}
+	}()
+	return progressChan
 }
